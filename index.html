@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f2f3ef">
+  <title>Middlemaniac | Canonical integrations</title>
+  <link rel="stylesheet" href="index.css">
+  <script src="index.js" defer></script>
+</head>
+<body>
+  <input id="canonical-file" type="file" accept=".json,application/json" hidden>
+  <main class="page-shell builder-shell">
+    <section class="builder-workspace" aria-label="Canonical mapping workspace">
+      <div class="builder-actions">
+        <button class="button button-light" id="load-sample-mappings" type="button" aria-label="Load sample mappings" title="Load sample mappings"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 2.5 1.8 5.2 5.2 1.8-5.2 1.8L10 16.5l-1.8-5.2L3 9.5l5.2-1.8L10 2.5Zm5.5 10 .8 1.7 1.7.8-1.7.8-.8 1.7-.8-1.7-1.7-.8 1.7-.8.8-1.7Z"/></svg></button>
+        <button class="button button-light" id="import-canonical" type="button" aria-label="Import canonical mappings" title="Import canonical mappings"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 12V3m0 0L7 6m3-3 3 3M4 11v5h12v-5"/></svg></button>
+        <button class="button button-light" id="export-canonical" type="button" aria-label="Export canonical mappings" title="Export canonical mappings" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v9m0 0 3-3m-3 3L7 9M4 14v2h12v-2"/></svg></button>
+        <button class="button button-dark" id="clear-canonical" type="button" aria-label="Clear canonical mappings" title="Clear canonical mappings"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11m-9.5 0 .7 10h7.6l.7-10M8 6V4h4v2m-3 3v4m2-4v4"/></svg></button>
+      </div>
+      <div class="builder-content" id="detail-pane" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <dialog class="sample-dialog" id="sample-dialog" aria-labelledby="sample-dialog-title">
+    <div class="dialog-heading"><h2 id="sample-dialog-title">Sample mappings</h2><button class="icon-button" id="close-samples" type="button" aria-label="Close" title="Close"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></div>
+    <div class="sample-options">
+      <button class="sample-option" type="button" data-sample-model="Taxable"><strong>Taxable</strong><span>3 inbound · 3 outbound</span></button>
+      <button class="sample-option" type="button" data-sample-model="Shipable"><strong>Shipable</strong><span>1 inbound · 2 outbound</span></button>
+      <button class="sample-option" type="button" data-sample-model="Payble"><strong>Payble</strong><span>1 inbound · 2 outbound</span></button>
+    </div>
+  </dialog>
+
+  <dialog class="canonical-export-dialog" id="canonical-export-dialog" aria-labelledby="canonical-export-title">
+    <div class="dialog-heading">
+      <div><h2 id="canonical-export-title">Export canonical mappings</h2></div>
+      <button class="icon-button" id="close-canonical-export" type="button" aria-label="Close export preview" title="Close"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
+    </div>
+    <label class="canonical-export-label" for="canonical-export-preview">JSON preview</label>
+    <textarea class="canonical-export-preview" id="canonical-export-preview" readonly spellcheck="false"></textarea>
+    <div class="canonical-export-actions">
+      <button class="button button-light" id="cancel-canonical-export" type="button">Cancel</button>
+      <button class="button button-dark" id="download-canonical-export" type="button">Download JSON</button>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
