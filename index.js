@@ -22,6 +22,12 @@ const sampleMappings = [
 const state = { records: loadRecords(), selectedId: loadSelectedId(), toastTimer: 0, inlineMappingKind: null, exportRecordId: null };
 const ui = {
   detail: document.querySelector("#detail-pane"), file: document.querySelector("#canonical-file"),
+  detailTemplate: document.querySelector("#canonical-detail-template"),
+  mappingGroupTemplate: document.querySelector("#canonical-mapping-group-template"),
+  mappingRowTemplate: document.querySelector("#canonical-mapping-row-template"),
+  mappingFormTemplate: document.querySelector("#canonical-mapping-form-template"),
+  flowTemplate: document.querySelector("#canonical-flow-template"),
+  flowNodeTemplate: document.querySelector("#canonical-flow-node-template"),
   sampleDialog: document.querySelector("#sample-dialog"),
   exportDialog: document.querySelector("#canonical-export-dialog"),
   clearDialog: document.querySelector("#clear-dialog"),
@@ -110,29 +116,20 @@ function persist() {
   }
 }
 
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  })[character]);
-}
-
 function renderDetail() {
   const record = state.records.find((item) => item.id === state.selectedId);
-  if (!record) {
-    const placeholder = { id: "", model: "Canonical", inboundMappings: [], outboundMappings: [] };
-    ui.detail.innerHTML = `<div class="container-fluid px-0"><div class="integration-mappings row g-4 mt-4 pt-3 border-top">${renderMappingGroup(placeholder, "inbound")}${renderMappingGroup(placeholder, "outbound")}</div>${renderCanonicalFlow(null)}</div>`;
-    drawCanonicalFlow();
-    return;
+  const displayRecord = record || { model: "Canonical", inboundMappings: [], outboundMappings: [] };
+  const detail = ui.detailTemplate.content.firstElementChild.cloneNode(true);
+  const heading = detail.querySelector("[data-detail-heading]");
+  heading.classList.toggle("d-none", !record);
+  if (record) {
+    heading.querySelector("[data-record-category]").textContent = record.category;
+    heading.querySelector("[data-record-model]").textContent = record.model;
   }
-  ui.detail.innerHTML = `
-    <div class="container-fluid px-0">
-      <div class="border-bottom pb-3"><span class="font-monospace text-uppercase small text-body-secondary">${escapeHtml(record.category)}</span><h2 class="h3 mb-0 mt-1 text-success-emphasis text-break">${escapeHtml(record.model)}</h2></div>
-      <div class="integration-mappings row g-4 mt-4 pt-3 border-top">
-        ${renderMappingGroup(record, "inbound")}
-        ${renderMappingGroup(record, "outbound")}
-      </div>
-      ${renderCanonicalFlow(record)}
-    </div>`;
+  const groups = detail.querySelector("[data-mapping-groups]");
+  groups.append(renderMappingGroup(displayRecord, "inbound"), renderMappingGroup(displayRecord, "outbound"));
+  detail.querySelector("[data-flow-slot]").append(renderCanonicalFlow(record));
+  ui.detail.replaceChildren(detail);
   drawCanonicalFlow();
 }
 
@@ -140,13 +137,28 @@ function renderCanonicalFlow(record) {
   const inboundMappings = record?.inboundMappings || [];
   const outboundMappings = record?.outboundMappings || [];
   const model = record?.model || "Canonical";
-  const sourceNodes = inboundMappings.length
-    ? inboundMappings.map((mapping) => `<div class="align-self-center mw-100 border rounded bg-white px-2 py-2 text-center text-break" data-flow-inbound="${escapeHtml(mapping.id)}">${escapeHtml(mapping.system)}</div>`).join("")
-    : `<div class="align-self-center mw-100 border rounded bg-body-tertiary px-2 py-2 text-center text-body-secondary">Source</div>`;
-  const targetNodes = outboundMappings.length
-    ? outboundMappings.map((mapping) => `<div class="align-self-center mw-100 border rounded bg-white px-2 py-2 text-center text-break" data-flow-outbound="${escapeHtml(mapping.id)}">${escapeHtml(mapping.system)}</div>`).join("")
-    : `<div class="align-self-center mw-100 border rounded bg-body-tertiary px-2 py-2 text-center text-body-secondary">Target</div>`;
-  return `<section class="canonical-visualization position-relative d-grid align-items-start gap-3 border rounded bg-body-tertiary p-3 mt-4" aria-label="Mapping flow"><div class="canonical-flow-side position-relative align-self-stretch z-1"><span class="position-absolute top-0 w-100 text-center font-monospace small text-uppercase text-body-secondary">Inbound mappings</span><div class="canonical-flow-nodes d-flex flex-column gap-2">${sourceNodes}</div></div><svg class="flow-connectors position-absolute top-0 start-0 w-100 h-100 pe-none z-0 overflow-visible" aria-hidden="true"></svg><div class="flow-canonical position-relative align-self-center mw-100 z-1 border border-success-subtle rounded bg-success-subtle p-2 text-center text-success-emphasis text-break">${escapeHtml(model)}</div><div class="canonical-flow-side position-relative align-self-stretch z-1"><span class="position-absolute top-0 w-100 text-center font-monospace small text-uppercase text-body-secondary">Outbound mappings</span><div class="canonical-flow-nodes d-flex flex-column gap-2">${targetNodes}</div></div></section>`;
+  const flow = ui.flowTemplate.content.firstElementChild.cloneNode(true);
+  flow.querySelector("[data-flow-model]").textContent = model;
+  renderFlowNodes(flow.querySelector("[data-flow-inbound-list]"), inboundMappings, "inbound");
+  renderFlowNodes(flow.querySelector("[data-flow-outbound-list]"), outboundMappings, "outbound");
+  return flow;
+}
+
+function renderFlowNodes(container, mappings, direction) {
+  if (mappings.length) {
+    for (const mapping of mappings) {
+      const node = ui.flowNodeTemplate.content.firstElementChild.cloneNode(true);
+      node.textContent = mapping.system;
+      node.dataset[`flow${direction === "inbound" ? "Inbound" : "Outbound"}`] = mapping.id;
+      container.append(node);
+    }
+    return;
+  }
+  const placeholder = ui.flowNodeTemplate.content.firstElementChild.cloneNode(true);
+  placeholder.classList.remove("bg-white");
+  placeholder.classList.add("bg-body-tertiary", "text-body-secondary");
+  placeholder.textContent = direction === "inbound" ? "Source" : "Target";
+  container.append(placeholder);
 }
 
 function drawCanonicalFlow() {
@@ -165,27 +177,11 @@ function drawCanonicalFlow() {
   const minimumHeight = parseFloat(flowStyle.minHeight) || 0;
   flow.style.minHeight = `${Math.max(minimumHeight, stackHeight + 2 * (headerHeight + stackGap) + verticalChrome)}px`;
   const bounds = flow.getBoundingClientRect();
-  svg.replaceChildren();
+  for (const connector of svg.querySelectorAll("[data-flow-connector]")) connector.remove();
   svg.setAttribute("viewBox", `0 0 ${bounds.width} ${bounds.height}`);
   svg.setAttribute("width", bounds.width);
   svg.setAttribute("height", bounds.height);
   if (!record || (!record.inboundMappings.length && !record.outboundMappings.length) || !bounds.width || !bounds.height) return;
-
-  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-  const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
-  marker.setAttribute("id", "flow-arrowhead");
-  marker.setAttribute("viewBox", "0 0 8 8");
-  marker.setAttribute("refX", "7");
-  marker.setAttribute("refY", "4");
-  marker.setAttribute("markerWidth", "6");
-  marker.setAttribute("markerHeight", "6");
-  marker.setAttribute("orient", "auto-start-reverse");
-  const arrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  arrow.setAttribute("d", "M0 0 8 4 0 8Z");
-  arrow.setAttribute("fill", "#91aa98");
-  marker.append(arrow);
-  defs.append(marker);
-  svg.append(defs);
 
   const center = (element, side) => {
     const rect = element.getBoundingClientRect();
@@ -213,6 +209,7 @@ function drawCanonicalFlow() {
     inbound.setAttribute("stroke-width", "1.5");
     inbound.setAttribute("opacity", "0.8");
     inbound.setAttribute("marker-end", "url(#flow-arrowhead)");
+    inbound.dataset.flowConnector = "true";
     svg.append(inbound);
   }
   const outboundSpacing = Math.min(7, canonicalBounds.height / (record.outboundMappings.length + 1));
@@ -229,6 +226,7 @@ function drawCanonicalFlow() {
     outbound.setAttribute("stroke-width", "1.5");
     outbound.setAttribute("opacity", "0.8");
     outbound.setAttribute("marker-end", "url(#flow-arrowhead)");
+    outbound.dataset.flowConnector = "true";
     svg.append(outbound);
   }
 }
@@ -238,11 +236,37 @@ function renderMappingGroup(record, direction) {
   const mappings = record[`${direction}Mappings`];
   const title = inbound ? "Inbound mappings" : "Outbound mappings";
   const kind = inbound ? "source" : "target";
-  const rows = mappings.map((mapping) => `
-    <div class="list-group-item border-0 border-bottom rounded-0 px-0 py-2 d-flex align-items-center gap-2"><span class="flex-grow-1 text-break fw-semibold">${escapeHtml(mapping.system)}</span><a class="btn btn-link btn-sm p-0 text-nowrap" href="${getMapperUrl(record, mapping, direction)}" target="_blank" rel="noopener noreferrer">Open<span aria-hidden="true"> ↗</span></a><button class="btn btn-sm btn-outline-secondary p-1" type="button" data-remove-mapping="${direction}" data-mapping-id="${escapeHtml(mapping.id)}" aria-label="Remove ${escapeHtml(mapping.system)} mapping" title="Remove mapping"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6h11m-9.5 0 .7 10h7.6l.7-10M8 6V4h4v2m-3 3v4m2-4v4"/></svg></button></div>`
-  ).join("");
-  const addForm = state.inlineMappingKind === direction ? `<form class="input-group input-group-sm mt-2" data-mapping-form="${direction}"><input class="form-control" id="inline-mapping-system" type="text" maxlength="80" aria-label="${inbound ? "Source" : "Target"} system" placeholder="${inbound ? "Source system" : "Target system"}" required><button class="btn btn-success" type="submit" aria-label="Add mapping" title="Add mapping"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 10 4 4 8-8"/></svg></button><button class="btn btn-outline-secondary" type="button" data-action="cancel-mapping" aria-label="Cancel" title="Cancel"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></form>` : "";
-  return `<section class="mapping-group col-6" aria-label="${title}"><div class="d-flex align-items-center justify-content-between gap-2 mb-2"><div><span class="font-monospace small text-uppercase text-body-secondary">${inbound ? "SOURCE → CANONICAL" : "CANONICAL → TARGET"}</span><h3 class="h6 mb-0 mt-1">${title}</h3></div><div class="d-flex align-items-center gap-2"><span class="badge rounded-pill text-bg-success">${mappings.length}</span><button class="btn btn-sm btn-outline-secondary p-1" type="button" data-action="add-${direction}-mapping" aria-label="Add ${kind} mapping" title="Add ${kind} mapping"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button></div></div><div class="list-group list-group-flush">${rows}</div>${addForm}</section>`;
+  const group = ui.mappingGroupTemplate.content.firstElementChild.cloneNode(true);
+  group.setAttribute("aria-label", title);
+  group.querySelector("[data-mapping-direction-label]").textContent = inbound ? "SOURCE → CANONICAL" : "CANONICAL → TARGET";
+  group.querySelector("[data-mapping-title]").textContent = title;
+  group.querySelector("[data-mapping-count]").textContent = String(mappings.length);
+  const addButton = group.querySelector('[data-action^="add-"]');
+  addButton.dataset.action = `add-${direction}-mapping`;
+  addButton.setAttribute("aria-label", `Add ${kind} mapping`);
+  addButton.title = `Add ${kind} mapping`;
+  const rows = group.querySelector("[data-mapping-rows]");
+  for (const mapping of mappings) rows.append(renderMappingRow(record, mapping, direction));
+  if (state.inlineMappingKind === direction) {
+    const form = ui.mappingFormTemplate.content.firstElementChild.cloneNode(true);
+    form.dataset.mappingForm = direction;
+    const input = form.querySelector("[data-inline-mapping-system]");
+    input.setAttribute("aria-label", `${inbound ? "Source" : "Target"} system`);
+    input.placeholder = `${inbound ? "Source" : "Target"} system`;
+    group.querySelector("[data-inline-form-slot]").append(form);
+  }
+  return group;
+}
+
+function renderMappingRow(record, mapping, direction) {
+  const row = ui.mappingRowTemplate.content.firstElementChild.cloneNode(true);
+  row.querySelector("[data-mapping-system]").textContent = mapping.system;
+  row.querySelector("[data-mapping-open]").href = getMapperUrl(record, mapping, direction);
+  const removeButton = row.querySelector("[data-remove-mapping]");
+  removeButton.dataset.removeMapping = direction;
+  removeButton.dataset.mappingId = mapping.id;
+  removeButton.setAttribute("aria-label", `Remove ${mapping.system} mapping`);
+  return row;
 }
 
 function getMapperUrl(record, mapping, direction) {
@@ -327,7 +351,7 @@ function loadSampleCanonical(model) {
 }
 
 function saveInlineMapping(direction) {
-  const input = document.querySelector("#inline-mapping-system");
+  const input = document.querySelector("[data-inline-mapping-system]");
   const name = input?.value.trim();
   if (!name) return;
   const record = ensureDefaultCanonical();
@@ -374,7 +398,7 @@ ui.detail.addEventListener("click", (event) => {
     ensureDefaultCanonical();
     state.inlineMappingKind = action.startsWith("add-inbound") ? "inbound" : "outbound";
     render();
-    document.querySelector("#inline-mapping-system")?.focus();
+    document.querySelector("[data-inline-mapping-system]")?.focus();
   }
   if (action === "cancel-mapping") {
     state.inlineMappingKind = null;
