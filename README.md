@@ -2,10 +2,6 @@
 
 MM Canonical is a Canonical Data Model builder tool for defining canonical mapping around a shared model.
 
-## Run
-
-Open `index.html`. Canonical models and mapping definitions are saved in that browser's local storage; no server or backend is required.
-
 ## Workflow
 
 1. Create or select a canonical model.

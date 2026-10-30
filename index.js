@@ -1,6 +1,7 @@
 "use strict";
 
 const storageKey = "middlemaniac.canonical-registry.v1";
+const selectedStorageKey = `${storageKey}.selected`;
 const sampleMappings = [
   {
     id: "sample-taxable", name: "Taxable", model: "Taxable", category: "Taxation", status: "Active",
@@ -18,14 +19,23 @@ const sampleMappings = [
     outboundMappings: [{ id: "payble-card", system: "Credit Card" }, { id: "payble-upi", system: "UPI" }]
   }
 ];
-const state = { records: loadRecords(), selectedId: null, toastTimer: 0, inlineMappingKind: null, exportRecordId: null };
+const state = { records: loadRecords(), selectedId: loadSelectedId(), toastTimer: 0, inlineMappingKind: null, exportRecordId: null };
 const ui = {
   detail: document.querySelector("#detail-pane"), file: document.querySelector("#canonical-file"),
   sampleDialog: document.querySelector("#sample-dialog"),
   exportDialog: document.querySelector("#canonical-export-dialog"),
+  clearDialog: document.querySelector("#clear-dialog"),
   exportPreview: document.querySelector("#canonical-export-preview"),
   toast: document.querySelector("#toast")
 };
+
+for (const dialog of document.querySelectorAll("dialog")) {
+  dialog.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    dialog.close();
+  });
+}
 
 function loadRecords() {
   try {
@@ -35,6 +45,15 @@ function loadRecords() {
     console.warn("Could not restore the integration registry.", error);
   }
   return [];
+}
+
+function loadSelectedId() {
+  try {
+    return localStorage.getItem(selectedStorageKey);
+  } catch (error) {
+    console.warn("Could not restore the selected canonical model.", error);
+    return null;
+  }
 }
 
 function normalizeRecord(record) {
@@ -84,6 +103,8 @@ function groupRecords(records) {
 function persist() {
   try {
     localStorage.setItem(storageKey, JSON.stringify(state.records));
+    if (state.selectedId) localStorage.setItem(selectedStorageKey, state.selectedId);
+    else localStorage.removeItem(selectedStorageKey);
   } catch (error) {
     showToast("Could not save changes in this browser.");
   }
@@ -99,14 +120,14 @@ function renderDetail() {
   const record = state.records.find((item) => item.id === state.selectedId);
   if (!record) {
     const placeholder = { id: "", model: "Canonical", inboundMappings: [], outboundMappings: [] };
-    ui.detail.innerHTML = `<div class="empty-canonical-view"><div class="integration-mappings">${renderMappingGroup(placeholder, "inbound")}${renderMappingGroup(placeholder, "outbound")}</div>${renderCanonicalFlow(null)}</div>`;
+    ui.detail.innerHTML = `<div class="container-fluid px-0"><div class="integration-mappings row g-4 mt-4 pt-3 border-top">${renderMappingGroup(placeholder, "inbound")}${renderMappingGroup(placeholder, "outbound")}</div>${renderCanonicalFlow(null)}</div>`;
     drawCanonicalFlow();
     return;
   }
   ui.detail.innerHTML = `
-    <div class="current-use-case">
-      <div class="canonical-heading"><div><span class="canonical-category">${escapeHtml(record.category)}</span><h2>${escapeHtml(record.model)}</h2></div></div>
-      <div class="integration-mappings">
+    <div class="container-fluid px-0">
+      <div class="border-bottom pb-3"><span class="font-monospace text-uppercase small text-body-secondary">${escapeHtml(record.category)}</span><h2 class="h3 mb-0 mt-1 text-success-emphasis text-break">${escapeHtml(record.model)}</h2></div>
+      <div class="integration-mappings row g-4 mt-4 pt-3 border-top">
         ${renderMappingGroup(record, "inbound")}
         ${renderMappingGroup(record, "outbound")}
       </div>
@@ -120,12 +141,12 @@ function renderCanonicalFlow(record) {
   const outboundMappings = record?.outboundMappings || [];
   const model = record?.model || "Canonical";
   const sourceNodes = inboundMappings.length
-    ? inboundMappings.map((mapping) => `<div class="flow-system" data-flow-inbound="${escapeHtml(mapping.id)}">${escapeHtml(mapping.system)}</div>`).join("")
-    : `<div class="flow-system is-placeholder">Source</div>`;
+    ? inboundMappings.map((mapping) => `<div class="align-self-center mw-100 border rounded bg-white px-2 py-2 text-center text-break" data-flow-inbound="${escapeHtml(mapping.id)}">${escapeHtml(mapping.system)}</div>`).join("")
+    : `<div class="align-self-center mw-100 border rounded bg-body-tertiary px-2 py-2 text-center text-body-secondary">Source</div>`;
   const targetNodes = outboundMappings.length
-    ? outboundMappings.map((mapping) => `<div class="flow-system" data-flow-outbound="${escapeHtml(mapping.id)}">${escapeHtml(mapping.system)}</div>`).join("")
-    : `<div class="flow-system is-placeholder">Target</div>`;
-  return `<section class="canonical-visualization" aria-label="Mapping flow"><div class="flow-column"><span class="flow-column-label">Inbound mappings</span><div class="flow-system-list">${sourceNodes}</div></div><svg class="flow-connectors" aria-hidden="true"></svg><div class="flow-canonical" data-flow-canonical>${escapeHtml(model)}</div><div class="flow-column"><span class="flow-column-label">Outbound mappings</span><div class="flow-system-list">${targetNodes}</div></div></section>`;
+    ? outboundMappings.map((mapping) => `<div class="align-self-center mw-100 border rounded bg-white px-2 py-2 text-center text-break" data-flow-outbound="${escapeHtml(mapping.id)}">${escapeHtml(mapping.system)}</div>`).join("")
+    : `<div class="align-self-center mw-100 border rounded bg-body-tertiary px-2 py-2 text-center text-body-secondary">Target</div>`;
+  return `<section class="canonical-visualization position-relative d-grid align-items-start gap-3 border rounded bg-body-tertiary p-3 mt-4" aria-label="Mapping flow"><div class="canonical-flow-side position-relative align-self-stretch z-1"><span class="position-absolute top-0 w-100 text-center font-monospace small text-uppercase text-body-secondary">Inbound mappings</span><div class="canonical-flow-nodes d-flex flex-column gap-2">${sourceNodes}</div></div><svg class="flow-connectors position-absolute top-0 start-0 w-100 h-100 pe-none z-0 overflow-visible" aria-hidden="true"></svg><div class="flow-canonical position-relative align-self-center mw-100 z-1 border border-success-subtle rounded bg-success-subtle p-2 text-center text-success-emphasis text-break">${escapeHtml(model)}</div><div class="canonical-flow-side position-relative align-self-stretch z-1"><span class="position-absolute top-0 w-100 text-center font-monospace small text-uppercase text-body-secondary">Outbound mappings</span><div class="canonical-flow-nodes d-flex flex-column gap-2">${targetNodes}</div></div></section>`;
 }
 
 function drawCanonicalFlow() {
@@ -133,6 +154,16 @@ function drawCanonicalFlow() {
   if (!flow) return;
   const record = state.records.find((item) => item.id === state.selectedId);
   const svg = flow.querySelector(".flow-connectors");
+  flow.style.minHeight = "";
+  const sides = [...flow.querySelectorAll(".canonical-flow-side")];
+  const stackHeight = Math.max(...sides.map((side) => side.querySelector(".canonical-flow-nodes").getBoundingClientRect().height));
+  const headerHeight = Math.max(...sides.map((side) => side.querySelector("span").getBoundingClientRect().height));
+  const stackGap = Math.max(...sides.map((side) => parseFloat(getComputedStyle(side.querySelector(".canonical-flow-nodes")).rowGap) || 0));
+  const flowStyle = getComputedStyle(flow);
+  const verticalChrome = parseFloat(flowStyle.paddingTop) + parseFloat(flowStyle.paddingBottom)
+    + parseFloat(flowStyle.borderTopWidth) + parseFloat(flowStyle.borderBottomWidth);
+  const minimumHeight = parseFloat(flowStyle.minHeight) || 0;
+  flow.style.minHeight = `${Math.max(minimumHeight, stackHeight + 2 * (headerHeight + stackGap) + verticalChrome)}px`;
   const bounds = flow.getBoundingClientRect();
   svg.replaceChildren();
   svg.setAttribute("viewBox", `0 0 ${bounds.width} ${bounds.height}`);
@@ -163,7 +194,7 @@ function drawCanonicalFlow() {
       y: rect.top + rect.height / 2 - bounds.top
     };
   };
-  const canonical = flow.querySelector("[data-flow-canonical]");
+  const canonical = flow.querySelector(".flow-canonical");
   const canonicalBounds = canonical.getBoundingClientRect();
   const canonicalLeft = canonicalBounds.left - bounds.left;
   const canonicalRight = canonicalBounds.right - bounds.left;
@@ -177,7 +208,10 @@ function drawCanonicalFlow() {
     const control = Math.max(18, (canonicalLeft - sourcePoint.x) * 0.55);
     const inbound = document.createElementNS("http://www.w3.org/2000/svg", "path");
     inbound.setAttribute("d", `M ${sourcePoint.x} ${sourcePoint.y} C ${sourcePoint.x + control} ${sourcePoint.y}, ${canonicalLeft - control} ${portY}, ${canonicalLeft - 1} ${portY}`);
-    inbound.setAttribute("class", "flow-connector flow-connector-inbound");
+    inbound.setAttribute("fill", "none");
+    inbound.setAttribute("stroke", "#91aa98");
+    inbound.setAttribute("stroke-width", "1.5");
+    inbound.setAttribute("opacity", "0.8");
     inbound.setAttribute("marker-end", "url(#flow-arrowhead)");
     svg.append(inbound);
   }
@@ -190,11 +224,13 @@ function drawCanonicalFlow() {
     const control = Math.max(18, (targetPoint.x - canonicalRight) * 0.55);
     const outbound = document.createElementNS("http://www.w3.org/2000/svg", "path");
     outbound.setAttribute("d", `M ${canonicalRight + 1} ${portY} C ${canonicalRight + control} ${portY}, ${targetPoint.x - control} ${targetPoint.y}, ${targetPoint.x} ${targetPoint.y}`);
-    outbound.setAttribute("class", "flow-connector flow-connector-outbound");
+    outbound.setAttribute("fill", "none");
+    outbound.setAttribute("stroke", "#91aa98");
+    outbound.setAttribute("stroke-width", "1.5");
+    outbound.setAttribute("opacity", "0.8");
     outbound.setAttribute("marker-end", "url(#flow-arrowhead)");
     svg.append(outbound);
   }
-  if (canonical) canonical.style.zIndex = "1";
 }
 
 function renderMappingGroup(record, direction) {
@@ -203,10 +239,10 @@ function renderMappingGroup(record, direction) {
   const title = inbound ? "Inbound mappings" : "Outbound mappings";
   const kind = inbound ? "source" : "target";
   const rows = mappings.map((mapping) => `
-    <div class="mapping-entry"><span class="mapping-system-name">${escapeHtml(mapping.system)}</span><a class="mapping-open" href="${getMapperUrl(record, mapping, direction)}" target="_blank" rel="noopener noreferrer">Open mapping<span aria-hidden="true"> ↗</span></a><button class="icon-button system-delete" type="button" data-remove-mapping="${direction}" data-mapping-id="${escapeHtml(mapping.id)}" aria-label="Remove ${escapeHtml(mapping.system)} mapping" title="Remove mapping"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6h11m-9.5 0 .7 10h7.6l.7-10M8 6V4h4v2m-3 3v4m2-4v4"/></svg></button></div>`
+    <div class="list-group-item border-0 border-bottom rounded-0 px-0 py-2 d-flex align-items-center gap-2"><span class="flex-grow-1 text-break fw-semibold">${escapeHtml(mapping.system)}</span><a class="btn btn-link btn-sm p-0 text-nowrap" href="${getMapperUrl(record, mapping, direction)}" target="_blank" rel="noopener noreferrer">Open<span aria-hidden="true"> ↗</span></a><button class="btn btn-sm btn-outline-secondary p-1" type="button" data-remove-mapping="${direction}" data-mapping-id="${escapeHtml(mapping.id)}" aria-label="Remove ${escapeHtml(mapping.system)} mapping" title="Remove mapping"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6h11m-9.5 0 .7 10h7.6l.7-10M8 6V4h4v2m-3 3v4m2-4v4"/></svg></button></div>`
   ).join("");
-  const addForm = state.inlineMappingKind === direction ? `<form class="inline-mapping-form" data-mapping-form="${direction}"><input id="inline-mapping-system" type="text" maxlength="80" aria-label="${inbound ? "Source" : "Target"} system" placeholder="${inbound ? "Source system" : "Target system"}" required><button class="icon-button" type="submit" aria-label="Add mapping" title="Add mapping"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4 10 4 4 8-8"/></svg></button><button class="icon-button" type="button" data-action="cancel-mapping" aria-label="Cancel" title="Cancel"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></form>` : "";
-  return `<section class="mapping-group" aria-label="${title}"><div class="mapping-group-heading"><div><span class="eyebrow">${inbound ? "SOURCE → CANONICAL" : "CANONICAL → TARGET"}</span><h3>${title}</h3></div><div class="mapping-group-tools"><span class="mapping-total">${mappings.length}</span><button class="icon-button" type="button" data-action="add-${direction}-mapping" aria-label="Add ${kind} mapping" title="Add ${kind} mapping"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button></div></div><div class="mapping-entry-list">${rows}</div>${addForm}</section>`;
+  const addForm = state.inlineMappingKind === direction ? `<form class="input-group input-group-sm mt-2" data-mapping-form="${direction}"><input class="form-control" id="inline-mapping-system" type="text" maxlength="80" aria-label="${inbound ? "Source" : "Target"} system" placeholder="${inbound ? "Source system" : "Target system"}" required><button class="btn btn-success" type="submit" aria-label="Add mapping" title="Add mapping"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 10 4 4 8-8"/></svg></button><button class="btn btn-outline-secondary" type="button" data-action="cancel-mapping" aria-label="Cancel" title="Cancel"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"/></svg></button></form>` : "";
+  return `<section class="mapping-group col-6" aria-label="${title}"><div class="d-flex align-items-center justify-content-between gap-2 mb-2"><div><span class="font-monospace small text-uppercase text-body-secondary">${inbound ? "SOURCE → CANONICAL" : "CANONICAL → TARGET"}</span><h3 class="h6 mb-0 mt-1">${title}</h3></div><div class="d-flex align-items-center gap-2"><span class="badge rounded-pill text-bg-success">${mappings.length}</span><button class="btn btn-sm btn-outline-secondary p-1" type="button" data-action="add-${direction}-mapping" aria-label="Add ${kind} mapping" title="Add ${kind} mapping"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button></div></div><div class="list-group list-group-flush">${rows}</div>${addForm}</section>`;
 }
 
 function getMapperUrl(record, mapping, direction) {
@@ -223,10 +259,10 @@ function ensureDefaultCanonical() {
   let record = state.records.find((item) => item.id === state.selectedId);
   if (record) return record;
   record = {
-    id: "canonical-taxable",
-    name: "Taxable",
-    model: "Taxable",
-    category: "Taxation",
+    id: "canonical",
+    name: "Canonical",
+    model: "Canonical",
+    category: "Canonical",
     status: "Draft",
     inboundMappings: [],
     outboundMappings: [],
@@ -308,16 +344,19 @@ function saveInlineMapping(direction) {
 function showToast(message) {
   clearTimeout(state.toastTimer);
   ui.toast.textContent = message;
-  ui.toast.classList.add("is-visible");
-  state.toastTimer = window.setTimeout(() => ui.toast.classList.remove("is-visible"), 2400);
+  ui.toast.classList.remove("d-none");
+  state.toastTimer = window.setTimeout(() => ui.toast.classList.add("d-none"), 2400);
 }
 
 document.querySelector("#clear-canonical").addEventListener("click", () => {
-  if (!state.records.length) return;
-  if (!window.confirm("Clear all canonical mappings from this browser?")) return;
+  ui.clearDialog.showModal();
+});
+document.querySelector("#cancel-clear").addEventListener("click", () => ui.clearDialog.close());
+document.querySelector("#confirm-clear").addEventListener("click", () => {
   state.records = [];
   state.selectedId = null;
   state.inlineMappingKind = null;
+  ui.clearDialog.close();
   render();
   showToast("Canonical mappings cleared.");
 });
